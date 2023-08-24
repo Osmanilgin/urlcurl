@@ -1,5 +1,3 @@
-curlurls
-
 #!/bin/bash
 
 # Default values
