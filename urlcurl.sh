@@ -8,14 +8,14 @@ output_dir="url_responses"
 
 # Function to display script usage
 show_help() {
-    echo "Usage: $0 [OPTIONS]"
+    echo "Usage: cat urls.txt | $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -h                          Display this help message"
-    echo "  -t NUM       Specify the number of threads for parallel processing (default: 1)"
-    echo "  -H HEADER            Add a custom header to the HTTP requests"
-    echo "  -d delay                 Specify the delay between requests in seconds"
-    echo "  -o DIRECTORY        Specify the output directory name (default: url_responses)"
+    echo "  -h help          Display this help message"
+    echo "  -t threads       Specify the number of threads for parallel processing (default: 1)"
+    echo "  -H header        Add a custom header to the HTTP requests"
+    echo "  -d delay         Specify the delay between requests in seconds"
+    echo "  -o output        Specify the output directory name (default: url_responses)"
     exit 0
 }
 
