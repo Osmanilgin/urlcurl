@@ -1,89 +1,61 @@
 #!/bin/bash
 
-# Default values
-threads=1
-custom_headers=""
-delay=0
-output_dir="url_responses"
-
-# Function to display script usage
-show_help() {
-    echo "Usage: cat urls.txt | $0 [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  -h help          Display this help message"
-    echo "  -t threads       Specify the number of threads for parallel processing (default: 1)"
-    echo "  -H header        Add a custom header to the HTTP requests"
-    echo "  -d delay         Specify the delay between requests in seconds"
-    echo "  -o output        Specify the output directory name (default: url_responses)"
-    exit 0
+# Usage function for help
+usage() {
+    echo "Usage: $0 -l <input_file> -o <output_folder> [-p <port>]"
+    exit 1
 }
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    key="$1"
-    case $key in
-        -h)
-            show_help
-            ;;
-        -threads)
-            threads="$2"
-            shift
-            shift
-            ;;
-        -H)
-            custom_headers+="$2 "
-            shift
-            shift
-            ;;
-        -d)
-            delay="$2"
-            shift
-            shift
-            ;;
-        -o)
-            output_dir="$2"
-            shift
-            shift
-            ;;
-        *)
-            echo "Unknown option: $key"
-            exit 1
-            ;;
+# Parse command-line arguments
+port=""
+while getopts "l:o:p:h" opt; do
+    case ${opt} in
+        l) input_file=${OPTARG} ;;
+        o) output_folder=${OPTARG} ;;
+        p) port=${OPTARG} ;;
+        h) usage ;;
+        *) usage ;;
     esac
 done
 
-# Create the output directory
-mkdir -p "$output_dir"
+# Check if required arguments are provided
+if [[ -z "$input_file" || -z "$output_folder" ]]; then
+    usage
+fi
 
-# Define a function to process a URL
-process_url() {
-    url="$1"
-    url_dir="$output_dir/$(echo "$url" | sed 's/[^a-zA-Z0-9]/_/g')"
-    mkdir -p "$url_dir"
+# Ensure the output folder exists
+mkdir -p "$output_folder"
 
-    headers=$(curl -s -L -I $custom_headers "$url")
-    body=$(curl -s -L $custom_headers "$url")
+# Function to fetch headers and body, following redirects
+fetch_and_save() {
+    local ip=$1
+    local output_folder=$2
+    local port=$3
 
-    echo "$headers" > "$url_dir/headers.txt"
-    echo "$body" > "$url_dir/body.txt"
+    # Append port to IP if specified
+    if [[ -n "$port" ]]; then
+        ip="$ip:$port"
+    fi
 
-    echo "Response saved for: $url"
+    # Fetch headers and body using curl with redirect following (-L)
+    headers_file="$output_folder/${ip//[:]/_}_headers.txt"
+    body_file="$output_folder/${ip//[:]/_}_body.txt"
+
+    curl -s -L -D - "$ip" -o "$body_file" > "$headers_file" 2>/dev/null
+
+    # Separate headers and status line
+    sed -i -n "/^HTTP/{p; :a; n; /\r$/p; ta}" "$headers_file"
+
+    echo "Fetched $ip with redirects followed"
 }
 
-# Process URLs in parallel
-count=0
-while IFS= read -r url; do
-    ((count++))
-    process_url "$url" &
-    if [[ $count -ge $threads ]]; then
-        wait
-        count=0
-    fi
-    sleep "$delay"
-done
+# Read IP list and process each IP
+while IFS= read -r ip; do
+    [[ -z "$ip" ]] && continue
+    fetch_and_save "$ip" "$output_folder" "$port" &
+done < "$input_file"
 
-# Wait for any remaining background processes to finish
+# Wait for all background jobs to finish
 wait
 
-echo "Done"
+echo "Completed fetching headers and bodies with redirects followed."
